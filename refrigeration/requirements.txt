@@ -1,0 +1,10 @@
+Django>=4.2,<5.0
+matplotlib>=3.7.0
+numpy>=1.21.0
+plotly>=5.0.0
+django-crispy-forms>=2.0
+crispy-bootstrap4>=2022.1
+Pillow>=9.0.0
+python-decouple>=3.8
+CoolProp>=6.4.1
+pandas>=2.0.0

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نتایج محاسبه - {{ calc.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Tahoma, Arial, sans-serif;
+            background-color: #f8f9fa;
+            direction: rtl;
+        }
+        .result-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 1px solid #dee2e6;
+            margin-bottom: 2rem;
+        }
+        .metric-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            height: 100%;
+            margin-bottom: 1rem;
+        }
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #0d6efd;
+            margin-bottom: 0.5rem;
+        }
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .section-title {
+            color: #495057;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .table {
+            margin-bottom: 0;
+        }
+        .table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .table tr:last-child td {
+            border-bottom: none;
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .btn-outline-secondary {
+            border-color: #6c757d;
+            color: #6c757d;
+        }
+        .diagram-container {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <!-- Header -->
+        <div class="text-center mb-4">
+            <h1 class="h2 text-dark">
+                <i class="fas fa-chart-line ms-3"></i>
+                نتایج محاسبه
+            </h1>
+            <p class="text-muted">{{ calc.name }}</p>
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="row mb-4">
+            <div class="col-lg-3 col-md-6">
+                <div class="metric-card">
+                    <div class="metric-value">{{ results.cop_ideal|floatformat:2 }}</div>
+                    <div class="metric-label">COP ایده‌آل</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="metric-card">
+                    <div class="metric-value">{{ results.cop_actual|floatformat:2 }}</div>
+                    <div class="metric-label">COP واقعی</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="metric-card">
+                    <div class="metric-value">{{ results.cooling_capacity|floatformat:1 }}</div>
+                    <div class="metric-label">ظرفیت تبرید (kW)</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="metric-card">
+                    <div class="metric-value">{{ results.power_input|floatformat:1 }}</div>
+                    <div class="metric-label">توان مصرفی (kW)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Results -->
+        <div class="card result-card">
+            <div class="card-body p-4">
+                <div class="row">
+                    <!-- Input Parameters -->
+                    <div class="col-lg-4 mb-4">
+                        <h5 class="section-title">مشخصات ورودی</h5>
+                        <table class="table table-sm">
+                            <tr>
+                                <td>ماده مبرد:</td>
+                                <td><strong>{{ calc.refrigerant.name }}</strong></td>
+                            </tr>
+                            <tr>
+                                <td>دمای اواپراتور:</td>
+                                <td><strong>{{ calc.t_evap }} °C</strong></td>
+                            </tr>
+                            <tr>
+                                <td>دمای کندانسور:</td>
+                                <td><strong>{{ calc.t_cond }} °C</strong></td>
+                            </tr>
+                            <tr>
+                                <td>نرخ جرمی:</td>
+                                <td><strong>{{ calc.mass_flow }} kg/s</strong></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- Cycle Points -->
+                    <div class="col-lg-4 mb-4">
+                        <h5 class="section-title">نقاط سیکل</h5>
+                        <table class="table table-sm">
+                            <tr>
+                                <td>نقطه 1 (خروجی اواپراتور):</td>
+                                <td><strong>{{ results.points.h1|floatformat:1 }} kJ/kg</strong></td>
+                            </tr>
+                            <tr>
+                                <td>نقطه 2 (خروجی کمپرسور):</td>
+                                <td><strong>{{ results.points.h2|floatformat:1 }} kJ/kg</strong></td>
+                            </tr>
+                            <tr>
+                                <td>نقطه 3 (خروجی کندانسور):</td>
+                                <td><strong>{{ results.points.h3|floatformat:1 }} kJ/kg</strong></td>
+                            </tr>
+                            <tr>
+                                <td>نقطه 4 (خروجی شیر انبساط):</td>
+                                <td><strong>{{ results.points.h4|floatformat:1 }} kJ/kg</strong></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- Pressures -->
+                    <div class="col-lg-4 mb-4">
+                        <h5 class="section-title">فشارها و سایر اطلاعات</h5>
+                        <table class="table table-sm">
+                            <tr>
+                                <td>فشار اواپراتور:</td>
+                                <td><strong>{{ results.pressures.p_evap|floatformat:1 }} kPa</strong></td>
+                            </tr>
+                            <tr>
+                                <td>فشار کندانسور:</td>
+                                <td><strong>{{ results.pressures.p_cond|floatformat:1 }} kPa</strong></td>
+                            </tr>
+                            <tr>
+                                <td>دفع حرارت:</td>
+                                <td><strong>{{ results.heat_rejection|floatformat:1 }} kW</strong></td>
+                            </tr>
+                            <tr>
+                                <td>زمان محاسبه:</td>
+                                <td><strong>{{ calc.created_at|date:"Y/m/d H:i" }}</strong></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- P-h Diagram -->
+        <div class="card result-card">
+            <div class="card-header">
+                <h5 class="mb-0">نمودار فشار - آنتالپی (P-h)</h5>
+            </div>
+            <div class="card-body">
+                <div class="diagram-container">
+                    {{ diagram|safe }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="text-center mb-4">
+            <a href="{% url 'cycle_calculator:calculate' %}" class="btn btn-primary btn-lg ms-3">
+                <i class="fas fa-plus ms-2"></i>محاسبه جدید
+            </a>
+            <button onclick="window.print()" class="btn btn-outline-secondary btn-lg">
+                <i class="fas fa-print ms-2"></i>پرینت گزارش
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

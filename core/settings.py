@@ -15,6 +15,10 @@ from decouple import config
 import os
 import dj_database_url
 
+# Fix for MySQL - Use PyMySQL instead of mysqlclient
+import pymysql
+pymysql.install_as_MySQLdb()
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -26,7 +30,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-_o2xx+$2ya5y90y1p=i-sg**ll4ygyi2e9=s+5_m)r!-d_56px')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = config('DEBUG', default=True, cast=bool)
 
 # Railway deployment settings
 ALLOWED_HOSTS = [
@@ -90,20 +94,23 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Railway database configuration
 DATABASE_URL = config('DATABASE_URL', default='')
 if DATABASE_URL:
-    # Production - Use Railway database
+    # Production - Use Railway database (PostgreSQL)
     DATABASES = {
         'default': dj_database_url.parse(DATABASE_URL)
     }
 else:
-    # Local development - Use local MySQL
+    # Local development - Use local MySQL with PyMySQL
     DATABASES = {
         'default': {
-            'ENGINE': config('DB_ENGINE', default='django.db.backends.mysql'),
+            'ENGINE': 'django.db.backends.mysql',
             'NAME': config('DB_NAME', default='django_blog'),
             'USER': config('DB_USER', default='root'),
             'PASSWORD': config('DB_PASSWORD', default=''),
             'HOST': config('DB_HOST', default='localhost'),
             'PORT': config('DB_PORT', default='3306'),
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+            },
         }
     }
 

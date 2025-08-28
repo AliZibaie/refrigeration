@@ -8,6 +8,7 @@ Pillow>=9.0.0
 python-decouple>=3.8
 CoolProp>=6.4.1
 pandas>=2.0.0
+PyMySQL
 psycopg2-binary
 dj-database-url
 whitenoise

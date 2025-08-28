@@ -1,158 +1,195 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.http import JsonResponse
-from .models import Refrigerant, Calculation
-from .calculations.refrigerants import CoolPropRefrigerant
-from .calculations.cycles import VaporCompressionCycle
-import plotly.graph_objects as go
-import plotly.offline as pyo
+from django.shortcuts import render
+from django.views.generic import CreateView, ListView
+from django.urls import reverse_lazy
+from .models import Calculation, Refrigerant, StatePoint
+from .diagrams import ThermodynamicDiagrams
+import CoolProp.CoolProp as CP
 
 
-def calculate(request):
-    refrigerants = Refrigerant.objects.all()
+class CalculationCreateView(CreateView):
+    model = Calculation
+    fields = ['cycle_type', 'refrigerant', 'expansion_device', 'evaporator_temp', 'condenser_temp', 'generator_temp',
+              'absorber_temp']
+    template_name = 'cycle_calculator/calculate.html'
+    success_url = reverse_lazy('calculation_list')
 
-    if request.method == 'POST':
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        self.perform_calculation(self.object)
+        return response
+
+    def perform_calculation(self, calculation):
         try:
-            # Get form data
-            name = request.POST.get('name')
-            refrigerant_id = request.POST.get('refrigerant')
-            t_evap = float(request.POST.get('t_evap'))
-            t_cond = float(request.POST.get('t_cond'))
-            mass_flow = float(request.POST.get('mass_flow'))
+            refrigerant = calculation.refrigerant.coolprop_name
 
-            # Validation
-            if not all([name, refrigerant_id, t_evap, t_cond, mass_flow]):
-                raise ValueError("همه فیلدها باید پر شوند")
+            if calculation.cycle_type == 'vapor_compression':
+                self.calculate_vapor_compression(calculation, refrigerant)
+            elif calculation.cycle_type == 'absorption':
+                self.calculate_absorption(calculation, refrigerant)
 
-            if t_evap >= t_cond:
-                raise ValueError("دمای اواپراتور باید کمتر از دمای کندانسور باشد")
-
-            if mass_flow <= 0:
-                raise ValueError("نرخ جرمی باید مثبت باشد")
-
-            # Get refrigerant
-            refrigerant_obj = get_object_or_404(Refrigerant, id=refrigerant_id)
-
-            # Initialize refrigerant and cycle
-            refrigerant = CoolPropRefrigerant(refrigerant_obj.coolprop_name)
-            cycle = VaporCompressionCycle(
-                refrigerant=refrigerant,
-                t_evap=t_evap,
-                t_cond=t_cond,
-                mass_flow=mass_flow
-            )
-
-            # Calculate results
-            results = cycle.calculate()
-
-            # Save to database
-            calc = Calculation.objects.create(
-                name=name,
-                refrigerant=refrigerant_obj,
-                t_evap=t_evap,
-                t_cond=t_cond,
-                mass_flow=mass_flow,
-                cop_ideal=results['cop_ideal'],
-                cop_actual=results['cop_actual']
-            )
-
-            # Generate diagram
-            diagram = create_ph_diagram(results, refrigerant_obj.name)
-
-            return render(request, 'cycle_calculator/results.html', {
-                'calc': calc,
-                'results': results,
-                'diagram': diagram
-            })
-
-        except ValueError as e:
-            messages.error(request, str(e))
         except Exception as e:
-            messages.error(request, f'خطا در محاسبه: {str(e)}')
+            print(f"Calculation error: {e}")
 
-    return render(request, 'cycle_calculator/calculate.html', {
-        'refrigerants': refrigerants
-    })
+    def calculate_vapor_compression(self, calc, refrigerant):
+        T_evap = calc.evaporator_temp + 273.15
+        T_cond = calc.condenser_temp + 273.15
 
+        # State points
+        P_low = CP.PropsSI('P', 'T', T_evap, 'Q', 1, refrigerant)
+        P_high = CP.PropsSI('P', 'T', T_cond, 'Q', 0, refrigerant)
 
-def create_ph_diagram(results, refrigerant_name):
-    """Create enhanced P-h diagram"""
-    points = results['points']
-    pressures = results['pressures']
+        # Point 1: Evaporator exit (saturated vapor)
+        h1 = CP.PropsSI('H', 'T', T_evap, 'Q', 1, refrigerant)
+        s1 = CP.PropsSI('S', 'T', T_evap, 'Q', 1, refrigerant)
 
-    # Cycle points
-    h_vals = [points['h1'], points['h2'], points['h3'], points['h4'], points['h1']]
-    p_vals = [pressures['p_evap'], pressures['p_cond'], pressures['p_cond'], pressures['p_evap'], pressures['p_evap']]
-
-    fig = go.Figure()
-
-    # Add cycle line with gradient colors
-    colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7']
-
-    for i in range(len(h_vals) - 1):
-        fig.add_trace(go.Scatter(
-            x=[h_vals[i], h_vals[i + 1]],
-            y=[p_vals[i], p_vals[i + 1]],
-            mode='lines+markers',
-            name=f'Process {i + 1}-{i + 2 if i < 3 else 1}',
-            line=dict(color=colors[i], width=4),
-            marker=dict(size=12, color=colors[i])
-        ))
-
-    # Add point labels with annotations
-    labels = ['1 (Evaporator Out)', '2 (Compressor Out)', '3 (Condenser Out)', '4 (Expansion Valve Out)']
-    for i, (h, p, label) in enumerate(zip(h_vals[:-1], p_vals[:-1], labels)):
-        fig.add_annotation(
-            x=h, y=p,
-            text=f"<b>{label}</b><br>h={h:.1f} kJ/kg<br>P={p:.1f} kPa",
-            showarrow=True,
-            arrowhead=2,
-            arrowsize=1.5,
-            arrowwidth=2,
-            arrowcolor=colors[i],
-            bgcolor="rgba(255,255,255,0.9)",
-            bordercolor=colors[i],
-            borderwidth=2,
-            font=dict(size=10)
+        StatePoint.objects.create(
+            calculation=calc, point_number=1,
+            temperature=T_evap - 273.15, pressure=P_low / 1000,
+            enthalpy=h1 / 1000, entropy=s1 / 1000, quality=1.0
         )
 
-    fig.update_layout(
-        title=dict(
-            text=f'<b>نمودار P-h برای {refrigerant_name}</b>',
-            x=0.5,
-            font=dict(size=18)
-        ),
-        xaxis=dict(
-            title='<b>آنتالپی (kJ/kg)</b>',
-            gridcolor='lightgray',
-            showgrid=True
-        ),
-        yaxis=dict(
-            title='<b>فشار (kPa)</b>',
-            gridcolor='lightgray',
-            showgrid=True
-        ),
-        font=dict(family="Tahoma", size=12),
-        width=900,
-        height=650,
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
-        plot_bgcolor='rgba(248,249,250,1)',
-        paper_bgcolor='white'
-    )
+        # Point 2: Compressor exit
+        s2 = s1  # Isentropic compression
+        h2 = CP.PropsSI('H', 'P', P_high, 'S', s2, refrigerant)
+        T2 = CP.PropsSI('T', 'P', P_high, 'H', h2, refrigerant)
 
-    return pyo.plot(fig, output_type='div', include_plotlyjs=False)
+        StatePoint.objects.create(
+            calculation=calc, point_number=2,
+            temperature=T2 - 273.15, pressure=P_high / 1000,
+            enthalpy=h2 / 1000, entropy=s2 / 1000
+        )
+
+        # Point 3: Condenser exit (saturated liquid)
+        h3 = CP.PropsSI('H', 'T', T_cond, 'Q', 0, refrigerant)
+        s3 = CP.PropsSI('S', 'T', T_cond, 'Q', 0, refrigerant)
+
+        StatePoint.objects.create(
+            calculation=calc, point_number=3,
+            temperature=T_cond - 273.15, pressure=P_high / 1000,
+            enthalpy=h3 / 1000, entropy=s3 / 1000, quality=0.0
+        )
+
+        # Point 4: After expansion
+        if calc.expansion_device == 'throttle':
+            # Throttling: h4 = h3
+            h4 = h3
+            T4 = CP.PropsSI('T', 'P', P_low, 'H', h4, refrigerant)
+            s4 = CP.PropsSI('S', 'P', P_low, 'H', h4, refrigerant)
+            x4 = CP.PropsSI('Q', 'P', P_low, 'H', h4, refrigerant)
+        else:
+            # Turbine: s4 = s3 (isentropic)
+            s4 = s3
+            h4 = CP.PropsSI('H', 'P', P_low, 'S', s4, refrigerant)
+            T4 = CP.PropsSI('T', 'P', P_low, 'H', h4, refrigerant)
+            x4 = CP.PropsSI('Q', 'P', P_low, 'H', h4, refrigerant)
+
+        StatePoint.objects.create(
+            calculation=calc, point_number=4,
+            temperature=T4 - 273.15, pressure=P_low / 1000,
+            enthalpy=h4 / 1000, entropy=s4 / 1000, quality=x4
+        )
+
+        # Calculate COP
+        q_evap = h1 - h4  # Cooling effect
+        w_comp = h2 - h1  # Compressor work
+        w_turb = h3 - h4 if calc.expansion_device == 'turbine' else 0
+
+        net_work = w_comp - w_turb
+        cop = q_evap / net_work if net_work > 0 else 0
+
+        calc.cop = cop
+        calc.cooling_capacity = q_evap / 1000  # kJ/kg
+        calc.save()
+
+    def calculate_absorption(self, calc, refrigerant):
+        # Simplified absorption cycle calculation
+        T_evap = calc.evaporator_temp + 273.15
+        T_cond = calc.condenser_temp + 273.15
+        T_gen = calc.generator_temp + 273.15 if calc.generator_temp else T_cond + 20
+        T_abs = calc.absorber_temp + 273.15 if calc.absorber_temp else T_evap + 10
+
+        # Basic absorption cycle points (simplified)
+        P_low = CP.PropsSI('P', 'T', T_evap, 'Q', 1, refrigerant)
+        P_high = CP.PropsSI('P', 'T', T_cond, 'Q', 0, refrigerant)
+
+        h1 = CP.PropsSI('H', 'T', T_evap, 'Q', 1, refrigerant)
+        h2 = CP.PropsSI('H', 'T', T_cond, 'Q', 0, refrigerant)
+        h3 = h2  # Throttling
+
+        s1 = CP.PropsSI('S', 'T', T_evap, 'Q', 1, refrigerant)
+        s2 = CP.PropsSI('S', 'T', T_cond, 'Q', 0, refrigerant)
+        s3 = s2
+
+        StatePoint.objects.create(
+            calculation=calc, point_number=1,
+            temperature=T_evap - 273.15, pressure=P_low / 1000,
+            enthalpy=h1 / 1000, entropy=s1 / 1000, quality=1.0
+        )
+        StatePoint.objects.create(
+            calculation=calc, point_number=2,
+            temperature=T_cond - 273.15, pressure=P_high / 1000,
+            enthalpy=h2 / 1000, entropy=s2 / 1000, quality=0.0
+        )
+        StatePoint.objects.create(
+            calculation=calc, point_number=3,
+            temperature=T_evap - 273.15, pressure=P_low / 1000,
+            enthalpy=h3 / 1000, entropy=s3 / 1000
+        )
+
+        # Simplified COP calculation for absorption
+        q_evap = h1 - h3
+        q_gen = 2000000  # Simplified heat input
+        cop = q_evap / q_gen if q_gen > 0 else 0
+
+        calc.cop = cop
+        calc.cooling_capacity = q_evap / 1000
+        calc.save()
 
 
-def get_calculations(request):
-    """Get user calculations history"""
-    calculations = Calculation.objects.all().order_by('-created_at')[:10]
-    return render(request, 'cycle_calculator/history.html', {
-        'calculations': calculations
-    })
+class CalculationListView(ListView):
+    model = Calculation
+    template_name = 'cycle_calculator/calculation_list.html'
+    context_object_name = 'calculations'
+    ordering = ['-created_at']
+
+
+class CalculationDetailView(ListView):
+    model = StatePoint
+    template_name = 'cycle_calculator/calculation_detail.html'
+    context_object_name = 'state_points'
+
+    def get_queryset(self):
+        calc_id = self.kwargs['pk']
+        return StatePoint.objects.filter(calculation_id=calc_id).order_by('point_number')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        calculation = Calculation.objects.get(id=self.kwargs['pk'])
+        context['calculation'] = calculation
+
+        # Generate diagrams
+        try:
+            refrigerant_name = calculation.refrigerant.coolprop_name
+            diagrams = ThermodynamicDiagrams(refrigerant_name)
+
+            # Convert state points to dict format
+            state_points = []
+            for point in self.get_queryset():
+                state_points.append({
+                    'temperature': point.temperature,
+                    'pressure': point.pressure,
+                    'enthalpy': point.enthalpy,
+                    'entropy': point.entropy,
+                    'quality': point.quality
+                })
+
+            # Generate diagrams
+            context['ph_diagram'] = diagrams.create_ph_diagram(state_points)
+            context['pv_diagram'] = diagrams.create_pv_diagram(state_points)
+            context['ts_diagram'] = diagrams.create_ts_diagram(state_points)
+
+        except Exception as e:
+            print(f"Diagram generation error: {e}")
+            context['diagram_error'] = str(e)
+
+        return context

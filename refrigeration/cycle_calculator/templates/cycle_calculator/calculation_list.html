@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>لیست محاسبات</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Vazir', Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; margin-bottom: 30px; text-align: center; }
+        .calc-item { border: 1px solid #ddd; margin-bottom: 15px; padding: 20px; border-radius: 8px; background: #fafafa; }
+        .calc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .calc-title { font-weight: bold; color: #2c3e50; font-size: 18px; }
+        .calc-date { color: #7f8c8d; font-size: 14px; }
+        .calc-details { display: flex; gap: 30px; flex-wrap: wrap; }
+        .detail-item { display: flex; flex-direction: column; }
+        .detail-label { font-size: 12px; color: #7f8c8d; margin-bottom: 2px; }
+        .detail-value { font-weight: bold; color: #34495e; }
+        .btn { background: #3498db; color: white; padding: 8px 16px; border: none; border-radius: 5px; text-decoration: none; display: inline-block; transition: background 0.3s; }
+        .btn:hover { background: #2980b9; }
+        .new-calc { text-align: center; margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>محاسبات انجام شده</h1>
+
+        <div class="new-calc">
+            <a href="{% url 'calculator' %}" class="btn">محاسبه جدید</a>
+        </div>
+
+        {% for calc in calculations %}
+        <div class="calc-item">
+            <div class="calc-header">
+                <div class="calc-title">{{ calc.get_cycle_type_display }} - {{ calc.refrigerant.name }}</div>
+                <div class="calc-date">{{ calc.created_at|date:"Y/m/d H:i" }}</div>
+            </div>
+            <div class="calc-details">
+                <div class="detail-item">
+                    <span class="detail-label">ضریب عملکرد (COP)</span>
+                    <span class="detail-value">{{ calc.cop|floatformat:3 }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">ظرفیت سرمایش (kJ/kg)</span>
+                    <span class="detail-value">{{ calc.cooling_capacity|floatformat:2 }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">دمای تبخیرکن</span>
+                    <span class="detail-value">{{ calc.evaporator_temp }}°C</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">دمای کندانسور</span>
+                    <span class="detail-value">{{ calc.condenser_temp }}°C</span>
+                </div>
+                {% if calc.cycle_type == 'vapor_compression' %}
+                <div class="detail-item">
+                    <span class="detail-label">دستگاه انبساط</span>
+                    <span class="detail-value">{{ calc.get_expansion_device_display }}</span>
+                </div>
+                {% endif %}
+            </div>
+            <div style="margin-top: 15px;">
+                <a href="{% url 'calculation_detail' calc.pk %}" class="btn">مشاهده جزئیات</a>
+            </div>
+        </div>
+        {% empty %}
+        <p style="text-align: center; color: #7f8c8d; margin: 50px 0;">هیچ محاسبه‌ای انجام نشده است.</p>
+        {% endfor %}
+    </div>
+</body>
+</html>

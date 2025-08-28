@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Calculation Details</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .summary {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .diagrams-section {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .diagram-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .diagram-box {
+            flex: 1;
+            min-width: 400px;
+            max-width: 500px;
+            text-align: center;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .diagram-box h3 {
+            margin-top: 0;
+            color: #495057;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+        }
+        .diagram-box img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: white;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+        }
+        th {
+            background-color: #e9ecef;
+            font-weight: bold;
+            color: #495057;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        h1, h2 {
+            color: #343a40;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .summary-item {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .summary-item strong {
+            display: block;
+            color: #495057;
+            margin-bottom: 5px;
+        }
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #f5c6cb;
+        }
+        @media (max-width: 768px) {
+            .diagram-container {
+                flex-direction: column;
+            }
+            .diagram-box {
+                min-width: auto;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>جزئیات محاسبه</h1>
+
+        <div class="summary">
+            <h2>خلاصه</h2>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <strong>نوع سیکل:</strong>
+                    {{ calculation.get_cycle_type_display }}
+                </div>
+                <div class="summary-item">
+                    <strong>مبرد:</strong>
+                    {{ calculation.refrigerant.name }} ({{ calculation.refrigerant.coolprop_name }})
+                </div>
+                <div class="summary-item">
+                    <strong>وسیله انبساط:</strong>
+                    {{ calculation.get_expansion_device_display|default:"-" }}
+                </div>
+                <div class="summary-item">
+                    <strong>COP:</strong>
+                    {{ calculation.cop|floatformat:3|default:"-" }}
+                </div>
+                <div class="summary-item">
+                    <strong>ظرفیت خنک‌سازی:</strong>
+                    {{ calculation.cooling_capacity|floatformat:2|default:"-" }} kJ/kg
+                </div>
+                <div class="summary-item">
+                    <strong>تاریخ:</strong>
+                    {{ calculation.created_at|date:"Y-m-d H:i:s" }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Thermodynamic Diagrams Section -->
+        <div class="diagrams-section">
+            <h2>نمودارهای ترمودینامیکی</h2>
+            {% if diagram_error %}
+                <div class="error-message">
+                    <strong>خطا در تولید نمودار:</strong> {{ diagram_error }}
+                </div>
+            {% else %}
+                <div class="diagram-container">
+                    {% if ph_diagram %}
+                    <div class="diagram-box">
+                        <h3>نمودار P-h (فشار-آنتالپی)</h3>
+                        <img src="data:image/png;base64,{{ ph_diagram }}" alt="P-h Diagram">
+                    </div>
+                    {% endif %}
+
+                    {% if pv_diagram %}
+                    <div class="diagram-box">
+                        <h3>نمودار P-V (فشار-حجم مخصوص)</h3>
+                        <img src="data:image/png;base64,{{ pv_diagram }}" alt="P-V Diagram">
+                    </div>
+                    {% endif %}
+
+                    {% if ts_diagram %}
+                    <div class="diagram-box">
+                        <h3>نمودار T-S (دما-آنتروپی)</h3>
+                        <img src="data:image/png;base64,{{ ts_diagram }}" alt="T-S Diagram">
+                    </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="summary">
+            <h2>نقاط حالت</h2>
+            {% if state_points %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>نقطه</th>
+                            <th>دما (°C)</th>
+                            <th>فشار (kPa)</th>
+                            <th>آنتالپی (kJ/kg)</th>
+                            <th>آنتروپی (kJ/kg·K)</th>
+                            <th>کیفیت</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for point in state_points %}
+                        <tr>
+                            <td><strong>{{ point.point_number }}</strong></td>
+                            <td>{{ point.temperature|floatformat:2|default:"-" }}</td>
+                            <td>{{ point.pressure|floatformat:2|default:"-" }}</td>
+                            <td>{{ point.enthalpy|floatformat:2|default:"-" }}</td>
+                            <td>{{ point.entropy|floatformat:3|default:"-" }}</td>
+                            <td>{{ point.quality|floatformat:3|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>نقاط حالت در دسترس نیست.</p>
+            {% endif %}
+        </div>
+
+        <p><a href="{% url 'calculation_list' %}" class="btn">بازگشت به لیست</a></p>
+    </div>
+</body>
+</html>

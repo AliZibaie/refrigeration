@@ -2,31 +2,59 @@ from django.db import models
 
 
 class Refrigerant(models.Model):
-    name = models.CharField(max_length=50, verbose_name="نام ماده مبرد")
-    coolprop_name = models.CharField(max_length=50, verbose_name="نام در CoolProp")
-
-    class Meta:
-        verbose_name = "ماده مبرد"
-        verbose_name_plural = "مواد مبرد"
+    name = models.CharField(max_length=50)
+    coolprop_name = models.CharField(max_length=50)
+    description = models.TextField()
+    gwp = models.IntegerField()
+    odp = models.FloatField()
+    safety_class = models.CharField(max_length=10)
+    application = models.TextField(blank=True)
 
     def __str__(self):
         return self.name
 
 
 class Calculation(models.Model):
-    name = models.CharField(max_length=100, verbose_name="نام محاسبه")
-    refrigerant = models.ForeignKey(Refrigerant, on_delete=models.CASCADE, verbose_name="ماده مبرد")
-    t_evap = models.FloatField(verbose_name="دمای اواپراتور (°C)")
-    t_cond = models.FloatField(verbose_name="دمای کندانسور (°C)")
-    mass_flow = models.FloatField(verbose_name="نرخ جرمی (kg/s)")
-    cop_ideal = models.FloatField(null=True, blank=True, verbose_name="COP ایده‌آل")
-    cop_actual = models.FloatField(null=True, blank=True, verbose_name="COP واقعی")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاریخ ایجاد")
+    CYCLE_CHOICES = [
+        ('vapor_compression', 'Vapor Compression'),
+        ('absorption', 'Absorption'),
+    ]
 
-    class Meta:
-        verbose_name = "محاسبه"
-        verbose_name_plural = "محاسبات"
-        ordering = ['-created_at']
+    EXPANSION_CHOICES = [
+        ('throttle', 'Throttle Valve'),
+        ('turbine', 'Turbine'),
+    ]
+
+    cycle_type = models.CharField(max_length=20, choices=CYCLE_CHOICES)
+    refrigerant = models.ForeignKey(Refrigerant, on_delete=models.CASCADE)
+    expansion_device = models.CharField(max_length=10, choices=EXPANSION_CHOICES, default='throttle')
+
+    # Common parameters
+    evaporator_temp = models.FloatField()
+    condenser_temp = models.FloatField()
+
+    # Absorption specific
+    generator_temp = models.FloatField(null=True, blank=True)
+    absorber_temp = models.FloatField(null=True, blank=True)
+
+    # Results
+    cop = models.FloatField(null=True, blank=True)
+    cooling_capacity = models.FloatField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.get_cycle_type_display()} - {self.refrigerant} ({self.created_at})"
+
+
+class StatePoint(models.Model):
+    calculation = models.ForeignKey(Calculation, on_delete=models.CASCADE)
+    point_number = models.IntegerField()
+    temperature = models.FloatField(null=True, blank=True)
+    pressure = models.FloatField(null=True, blank=True)
+    enthalpy = models.FloatField(null=True, blank=True)
+    entropy = models.FloatField(null=True, blank=True)
+    quality = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ['calculation', 'point_number']

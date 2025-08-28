@@ -1,75 +1,80 @@
-from .base import CycleInterface, RefrigerantInterface
+from .refrigerants import CoolPropRefrigerant
 from typing import Dict
 import CoolProp.CoolProp as CP
 
-
-class VaporCompressionCycle(CycleInterface):
-    """Basic vapor compression refrigeration cycle"""
-
-    def __init__(self, refrigerant: RefrigerantInterface, t_evap: float, t_cond: float, mass_flow: float,
-                 efficiency: float = 0.8):
-        self.refrigerant = refrigerant
-        self.t_evap = t_evap
-        self.t_cond = t_cond
-        self.mass_flow = mass_flow
-        self.efficiency = efficiency
+class VaporCompressionCycle:
+    def __init__(self, refrigerant: str, t_evap: float, t_cond: float, expansion_device: str = 'throttle'):
+        self.refrigerant = CoolPropRefrigerant(refrigerant)
+        self.t_evap = t_evap + 273.15
+        self.t_cond = t_cond + 273.15
+        self.expansion_device = expansion_device
 
     def calculate(self) -> Dict:
-        """Calculate cycle performance"""
-        try:
-            # State points pressures
-            p_evap = self.refrigerant.get_pressure(self.t_evap)
-            p_cond = self.refrigerant.get_pressure(self.t_cond)
+        p_evap = self.refrigerant.get_pressure(self.t_evap)
+        p_cond = self.refrigerant.get_pressure(self.t_cond)
 
-            # State 1: Saturated vapor leaving evaporator
-            h1 = self.refrigerant.get_enthalpy(p_evap, quality=1.0)
-            s1 = self.refrigerant.get_entropy(p_evap, quality=1.0)
+        h1 = self.refrigerant.get_enthalpy(p_evap, quality=1.0)
+        s1 = self.refrigerant.get_entropy(p_evap, quality=1.0)
 
-            # State 2: After compression (isentropic ideal)
-            h2s = self._get_isentropic_enthalpy(p_cond, s1)
-            h2 = h1 + (h2s - h1) / self.efficiency  # Actual with efficiency
+        h2 = CP.PropsSI('H', 'P', p_cond, 'S', s1, self.refrigerant.name)
+        t2 = CP.PropsSI('T', 'P', p_cond, 'S', s1, self.refrigerant.name)
 
-            # State 3: Saturated liquid leaving condenser
-            h3 = self.refrigerant.get_enthalpy(p_cond, quality=0.0)
+        h3 = self.refrigerant.get_enthalpy(p_cond, quality=0.0)
+        s3 = self.refrigerant.get_entropy(p_cond, quality=0.0)
 
-            # State 4: After expansion (isenthalpic)
+        if self.expansion_device == 'throttle':
             h4 = h3
+            s4 = CP.PropsSI('S', 'P', p_evap, 'H', h4, self.refrigerant.name)
+        else:
+            s4 = s3
+            h4 = CP.PropsSI('H', 'P', p_evap, 'S', s4, self.refrigerant.name)
 
-            # Calculate cycle parameters
-            q_evap = h1 - h4  # Cooling effect
-            w_comp = h2 - h1  # Compressor work
-            q_cond = h2 - h3  # Heat rejection
+        t4 = CP.PropsSI('T', 'P', p_evap, 'H', h4, self.refrigerant.name)
+        x4 = CP.PropsSI('Q', 'P', p_evap, 'H', h4, self.refrigerant.name)
 
-            # Performance metrics
-            cop_ideal = q_evap / (h2s - h1)
-            cop_actual = q_evap / w_comp
-            cooling_capacity = self.mass_flow * q_evap / 1000  # kW
-            power_input = self.mass_flow * w_comp / 1000  # kW
+        q_evap = h1 - h4
+        w_comp = h2 - h1
+        w_turb = h3 - h4 if self.expansion_device == 'turbine' else 0
+        net_work = w_comp - w_turb
+        cop = q_evap / net_work
 
-            return {
-                'cop_ideal': round(cop_ideal, 3),
-                'cop_actual': round(cop_actual, 3),
-                'cooling_capacity': round(cooling_capacity, 2),
-                'power_input': round(power_input, 2),
-                'heat_rejection': round(self.mass_flow * q_cond / 1000, 2),
-                'points': {
-                    'h1': round(h1 / 1000, 2),  # Convert to kJ/kg
-                    'h2': round(h2 / 1000, 2),
-                    'h3': round(h3 / 1000, 2),
-                    'h4': round(h4 / 1000, 2)
-                },
-                'pressures': {
-                    'p_evap': round(p_evap / 1000, 2),  # Convert to kPa
-                    'p_cond': round(p_cond / 1000, 2)
-                },
-                'temperatures': {
-                    't_evap': self.t_evap,
-                    't_cond': self.t_cond
-                }
+        return {
+            'cop': round(cop, 3),
+            'cooling_capacity': round(q_evap / 1000, 2),
+            'points': {
+                1: {'h': round(h1/1000, 2), 't': round(self.t_evap-273.15, 1), 'p': round(p_evap/1000, 1), 's': round(s1/1000, 3), 'x': 1.0},
+                2: {'h': round(h2/1000, 2), 't': round(t2-273.15, 1), 'p': round(p_cond/1000, 1), 's': round(s1/1000, 3)},
+                3: {'h': round(h3/1000, 2), 't': round(self.t_cond-273.15, 1), 'p': round(p_cond/1000, 1), 's': round(s3/1000, 3), 'x': 0.0},
+                4: {'h': round(h4/1000, 2), 't': round(t4-273.15, 1), 'p': round(p_evap/1000, 1), 's': round(s4/1000, 3), 'x': round(x4, 3)}
             }
-        except Exception as e:
-            raise ValueError(f"Calculation error: {str(e)}")
+        }
 
-    def _get_isentropic_enthalpy(self, pressure: float, entropy: float) -> float:
-        """Calculate enthalpy at given pressure and entropy"""
-        return CP.PropsSI('H', 'P', pressure, 'S', entropy, self.refrigerant.name)
+class AbsorptionCycle:
+    def __init__(self, refrigerant: str, t_evap: float, t_cond: float, t_gen: float, t_abs: float):
+        self.refrigerant = CoolPropRefrigerant(refrigerant)
+        self.t_evap = t_evap + 273.15
+        self.t_cond = t_cond + 273.15
+        self.t_gen = t_gen + 273.15
+        self.t_abs = t_abs + 273.15
+
+    def calculate(self) -> Dict:
+        p_evap = self.refrigerant.get_pressure(self.t_evap)
+        p_cond = self.refrigerant.get_pressure(self.t_cond)
+
+        h1 = self.refrigerant.get_enthalpy(p_evap, quality=1.0)
+        h2 = self.refrigerant.get_enthalpy(p_cond, quality=0.0)
+        h3 = h2
+
+        q_evap = h1 - h3
+        q_gen = 1800000
+        cop = q_evap / q_gen
+
+        return {
+            'cop': round(cop, 3),
+            'cooling_capacity': round(q_evap / 1000, 2),
+            'points': {
+                1: {'h': round(h1/1000, 2), 't': round(self.t_evap-273.15, 1), 'p': round(p_evap/1000, 1)},
+                2: {'h': round(h2/1000, 2), 't': round(self.t_cond-273.15, 1), 'p': round(p_cond/1000, 1)},
+                3: {'h': round(h3/1000, 2), 't': round(self.t_evap-273.15, 1), 'p': round(p_evap/1000, 1)}
+            }
+        }

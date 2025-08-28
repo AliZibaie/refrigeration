@@ -39,7 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # custom apps
-    'cycle_calculator'
+    'cycle_calculator',
+    'cooling_load',
 ]
 
 MIDDLEWARE = [

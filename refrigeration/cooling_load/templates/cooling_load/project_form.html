@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <title>Cold Storage Calculator</title>
+   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+   <div class="container mt-4">
+       <h2>Cold Storage Project</h2>
+
+       {% if form.errors %}
+           <div class="alert alert-danger">
+               {{ form.errors }}
+           </div>
+       {% endif %}
+
+       <form method="post">
+           {% csrf_token %}
+
+           <div class="row">
+               <div class="col-md-6">
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.name.label }}</label>
+                       {{ form.name }}
+                       {% if form.name.errors %}
+                           <div class="text-danger">{{ form.name.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.storage_type.label }}</label>
+                       {{ form.storage_type }}
+                       {% if form.storage_type.errors %}
+                           <div class="text-danger">{{ form.storage_type.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.length.label }}</label>
+                       {{ form.length }}
+                       {% if form.length.errors %}
+                           <div class="text-danger">{{ form.length.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.width.label }}</label>
+                       {{ form.width }}
+                       {% if form.width.errors %}
+                           <div class="text-danger">{{ form.width.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.height.label }}</label>
+                       {{ form.height }}
+                       {% if form.height.errors %}
+                           <div class="text-danger">{{ form.height.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.insulation_type.label }}</label>
+                       {{ form.insulation_type }}
+                       {% if form.insulation_type.errors %}
+                           <div class="text-danger">{{ form.insulation_type.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.insulation_thickness.label }}</label>
+                       {{ form.insulation_thickness }}
+                       {% if form.insulation_thickness.errors %}
+                           <div class="text-danger">{{ form.insulation_thickness.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.outdoor_temp.label }}</label>
+                       {{ form.outdoor_temp }}
+                       {% if form.outdoor_temp.errors %}
+                           <div class="text-danger">{{ form.outdoor_temp.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.outdoor_humidity.label }}</label>
+                       {{ form.outdoor_humidity }}
+                       {% if form.outdoor_humidity.errors %}
+                           <div class="text-danger">{{ form.outdoor_humidity.errors }}</div>
+                       {% endif %}
+                   </div>
+               </div>
+
+               <div class="col-md-6">
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.indoor_temp.label }}</label>
+                       {{ form.indoor_temp }}
+                       {% if form.indoor_temp.errors %}
+                           <div class="text-danger">{{ form.indoor_temp.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.indoor_humidity.label }}</label>
+                       {{ form.indoor_humidity }}
+                       {% if form.indoor_humidity.errors %}
+                           <div class="text-danger">{{ form.indoor_humidity.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.product_mass.label }}</label>
+                       {{ form.product_mass }}
+                       {% if form.product_mass.errors %}
+                           <div class="text-danger">{{ form.product_mass.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.daily_product_input.label }}</label>
+                       {{ form.daily_product_input }}
+                       {% if form.daily_product_input.errors %}
+                           <div class="text-danger">{{ form.daily_product_input.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.number_of_workers.label }}</label>
+                       {{ form.number_of_workers }}
+                       {% if form.number_of_workers.errors %}
+                           <div class="text-danger">{{ form.number_of_workers.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.working_hours.label }}</label>
+                       {{ form.working_hours }}
+                       {% if form.working_hours.errors %}
+                           <div class="text-danger">{{ form.working_hours.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.lighting_power.label }}</label>
+                       {{ form.lighting_power }}
+                       {% if form.lighting_power.errors %}
+                           <div class="text-danger">{{ form.lighting_power.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.fan_power.label }}</label>
+                       {{ form.fan_power }}
+                       {% if form.fan_power.errors %}
+                           <div class="text-danger">{{ form.fan_power.errors }}</div>
+                       {% endif %}
+                   </div>
+
+                   <div class="mb-3">
+                       <label class="form-label">{{ form.door_openings.label }}</label>
+                       {{ form.door_openings }}
+                       {% if form.door_openings.errors %}
+                           <div class="text-danger">{{ form.door_openings.errors }}</div>
+                       {% endif %}
+                   </div>
+               </div>
+           </div>
+
+           <button type="submit" class="btn btn-primary">Calculate</button>
+       </form>
+   </div>
+</body>
+</html>

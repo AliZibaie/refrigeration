@@ -1,4 +1,3 @@
-```markdown
 # Refrigeration Cycles Calculator
 
 A Django web application for calculating refrigeration cycles with thermodynamic properties and COP analysis.
